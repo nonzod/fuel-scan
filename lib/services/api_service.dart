@@ -14,7 +14,9 @@ class ApiService {
       final response = await http.get(Uri.parse(stationsUrl));
       
       if (response.statusCode == 200) {
-        return _parseStationsCSV(response.body);
+        // Determinare la codifica corretta
+        String responseBody = utf8.decode(response.bodyBytes, allowMalformed: true);
+        return _parseStationsCSV(responseBody);
       } else {
         print('Errore nel download delle stazioni: ${response.statusCode}');
         throw Exception('Errore nel download delle stazioni: ${response.statusCode}');
@@ -38,7 +40,9 @@ class ApiService {
       final response = await http.get(Uri.parse(pricesUrl));
       
       if (response.statusCode == 200) {
-        return _parsePricesCSV(response.body);
+        // Determinare la codifica corretta
+        String responseBody = utf8.decode(response.bodyBytes, allowMalformed: true);
+        return _parsePricesCSV(responseBody);
       } else {
         print('Errore nel download dei prezzi: ${response.statusCode}');
         throw Exception('Errore nel download dei prezzi: ${response.statusCode}');
@@ -56,7 +60,7 @@ class ApiService {
     }
   }
 
-  // Metodo per il parsing del CSV delle stazioni
+  // Metodo migliorato per il parsing del CSV delle stazioni
   List<FuelStation> _parseStationsCSV(String csvData) {
     try {
       // Dividiamo per righe e saltiamo l'intestazione
@@ -73,26 +77,51 @@ class ApiService {
       for (var line in lines) {
         if (line.trim().isEmpty) continue;
         
-        // Gestisci correttamente le virgolette nei CSV
-        final fields = _parseCSVLine(line);
-        if (fields.length < 8) {
-          print('Riga CSV stazione malformata: $line');
-          continue;
-        }
-        
         try {
+          // Utilizziamo un parser CSV più robusto
+          final fields = _parseCSVLineRobust(line, separator: ';');
+          
+          if (fields.length < 8) {
+            print('Riga CSV stazione malformata (campi insufficienti): ${fields.length} campi - $line');
+            continue;
+          }
+          
+          final id = fields[0];
+          final name = fields[1];
+          final brand = fields[2];
+          final address = fields.length > 5 ? fields[5] : '';
+          final city = fields.length > 6 ? fields[6] : '';
+          final province = fields.length > 7 ? fields[7] : '';
+          
+          // Gestione più robusta delle coordinate
+          double? latitude;
+          double? longitude;
+          
+          if (fields.length > 8) {
+            latitude = double.tryParse(fields[8].replaceAll(',', '.'));
+          }
+          
+          if (fields.length > 9) {
+            longitude = double.tryParse(fields[9].replaceAll(',', '.'));
+          }
+          
+          if (id.isEmpty || (latitude == null || longitude == null)) {
+            print('Coordinate mancanti o ID vuoto: $line');
+            continue;
+          }
+          
           stations.add(FuelStation(
-            id: fields[0],
-            name: fields[1],
-            brand: fields[2],
-            address: fields[3],
-            city: fields[4],
-            province: fields[5],
-            latitude: double.tryParse(fields[6].replaceAll(',', '.')) ?? 0,
-            longitude: double.tryParse(fields[7].replaceAll(',', '.')) ?? 0,
+            id: id,
+            name: name,
+            brand: brand,
+            address: address,
+            city: city,
+            province: province,
+            latitude: latitude,
+            longitude: longitude,
           ));
         } catch (e) {
-          print('Errore nel parsing della stazione: $e');
+          print('Errore nel parsing della stazione: $e - Riga: $line');
         }
       }
       
@@ -104,7 +133,7 @@ class ApiService {
     }
   }
 
-  // Metodo per il parsing del CSV dei prezzi
+  // Metodo migliorato per il parsing del CSV dei prezzi
   Map<String, List<FuelPrice>> _parsePricesCSV(String csvData) {
     try {
       final prices = <String, List<FuelPrice>>{};
@@ -121,20 +150,39 @@ class ApiService {
       for (var line in lines) {
         if (line.trim().isEmpty) continue;
         
-        // Gestisci correttamente le virgolette nei CSV
-        final fields = _parseCSVLine(line);
-        if (fields.length < 5) {
-          print('Riga CSV prezzo malformata: $line');
-          continue;
-        }
-        
         try {
+          // Utilizziamo un parser CSV più robusto
+          final fields = _parseCSVLineRobust(line, separator: ';');
+          
+          if (fields.length < 5) {
+            print('Riga CSV prezzo malformata (campi insufficienti): ${fields.length} campi - $line');
+            continue;
+          }
+          
           final stationId = fields[0];
-          final price = FuelPrice(
-            id: fields[1],
-            fuelType: fields[2],
-            price: double.tryParse(fields[3].replaceAll(',', '.')) ?? 0,
-            isSelf: fields[4].toLowerCase() == 'self',
+          if (stationId.isEmpty) {
+            print('ID stazione mancante: $line');
+            continue;
+          }
+          
+          String id = fields.length > 1 ? fields[1] : '';
+          String fuelType = fields.length > 2 ? fields[2] : '';
+          String priceStr = fields.length > 3 ? fields[3].replaceAll(',', '.') : '0';
+          String serviceType = fields.length > 4 ? fields[4] : '';
+          
+          double priceValue = double.tryParse(priceStr) ?? 0;
+          bool isSelf = serviceType.toLowerCase() == 'self';
+          
+          if (id.isEmpty || fuelType.isEmpty) {
+            print('Dati carburante incompleti: $line');
+            continue;
+          }
+          
+          final fuelPrice = FuelPrice(
+            id: id,
+            fuelType: fuelType,
+            price: priceValue,
+            isSelf: isSelf,
             updatedAt: DateTime.now(),
           );
           
@@ -142,9 +190,9 @@ class ApiService {
             prices[stationId] = [];
           }
           
-          prices[stationId]!.add(price);
+          prices[stationId]!.add(fuelPrice);
         } catch (e) {
-          print('Errore nel parsing del prezzo: $e');
+          print('Errore nel parsing del prezzo: $e - Riga: $line');
         }
       }
       
@@ -156,29 +204,48 @@ class ApiService {
     }
   }
 
-  // Metodo per dividere correttamente le linee CSV (gestendo le virgolette)
-  List<String> _parseCSVLine(String line) {
+  // Metodo migliorato per dividere correttamente le linee CSV (gestendo le virgolette)
+  List<String> _parseCSVLineRobust(String line, {String separator = ';'}) {
     List<String> result = [];
+    
+    int i = 0;
     bool inQuotes = false;
     String currentField = '';
     
-    for (int i = 0; i < line.length; i++) {
+    // Gestiamo il caso in cui la riga sia vuota
+    if (line.isEmpty) {
+      return [];
+    }
+    
+    while (i < line.length) {
       final char = line[i];
       
       if (char == '"') {
-        inQuotes = !inQuotes;
-      } else if (char == ';' && !inQuotes) {
-        result.add(currentField.trim());
+        // Se abbiamo una virgoletta, controlliamo se è escapata o se è di chiusura/apertura
+        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+          // Virgoletta escapata all'interno di un campo tra virgolette
+          currentField += '"';
+          i++; // Saltiamo la seconda virgoletta
+        } else {
+          // Cambio dello stato delle virgolette (apriamo o chiudiamo)
+          inQuotes = !inQuotes;
+        }
+      } else if (char == separator && !inQuotes) {
+        // Abbiamo trovato un separatore fuori dalle virgolette, fine del campo
+        result.add(currentField);
         currentField = '';
       } else {
+        // Carattere normale, aggiungilo al campo corrente
         currentField += char;
       }
+      
+      i++;
     }
     
     // Aggiungi l'ultimo campo
-    result.add(currentField.trim());
+    result.add(currentField);
     
-    return result;
+    return result.map((field) => field.trim()).toList();
   }
   
   // Dati di test per il debug
