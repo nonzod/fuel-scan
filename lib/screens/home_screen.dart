@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  bool _initialized = false;
   final List<Widget> _screens = [
     const MapScreen(),
     const ListScreen(),
@@ -22,32 +23,66 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     // Inizializzazione dei dati
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FuelStationsProvider>().initialize();
-    });
+    _initializeData();
+  }
+  
+  Future<void> _initializeData() async {
+    try {
+      final provider = context.read<FuelStationsProvider>();
+      
+      if (provider.status == LoadingStatus.idle) {
+        await provider.initialize();
+      }
+      
+      if (mounted) {
+        setState(() {
+          _initialized = true;
+        });
+      }
+    } catch (e) {
+      print('Errore durante l\'inizializzazione home: $e');
+      if (mounted) {
+        setState(() {
+          _initialized = true; // Impostiamo comunque a true per mostrare la UI
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Mappa',
+      body: _initialized 
+        ? IndexedStack(
+            index: _selectedIndex,
+            children: _screens,
+          )
+        : const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Caricamento stazioni di servizio...'),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list),
-            label: 'Lista',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _initialized
+        ? BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: _onItemTapped,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.map),
+                label: 'Mappa',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.list),
+                label: 'Lista',
+              ),
+            ],
+          )
+        : null,
     );
   }
 

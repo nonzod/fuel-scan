@@ -16,12 +16,16 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
+  bool _mapInitialized = false;
   
   @override
   Widget build(BuildContext context) {
     return Consumer<FuelStationsProvider>(
       builder: (context, provider, child) {
-        _updateMarkers(provider.filteredStations);
+        // Aggiorniamo i marker quando i dati filtrati cambiano
+        if (provider.filteredStations.isNotEmpty) {
+          _updateMarkers(provider.filteredStations);
+        }
         
         return Scaffold(
           appBar: AppBar(
@@ -54,37 +58,97 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 onMapCreated: (controller) {
                   _mapController = controller;
+                  setState(() {
+                    _mapInitialized = true;
+                  });
+                  
+                  if (provider.filteredStations.isNotEmpty) {
+                    _updateMarkers(provider.filteredStations);
+                  }
+                  
+                  if (provider.currentPosition != null) {
+                    _centerOnUserLocation();
+                  }
                 },
                 markers: _markers,
                 myLocationEnabled: true,
                 myLocationButtonEnabled: true,
+                mapToolbarEnabled: true,
+                compassEnabled: true,
+                zoomControlsEnabled: true,
               ),
               if (provider.status == LoadingStatus.loading)
                 const Center(
-                  child: CircularProgressIndicator(),
+                  child: Card(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 8),
+                          Text('Caricamento...'),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               if (provider.status == LoadingStatus.error)
                 Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error, size: 50, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text(provider.errorMessage),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          provider.initialize();
-                        },
-                        child: const Text('Riprova'),
+                  child: Card(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error, size: 50, color: Colors.red),
+                          const SizedBox(height: 8),
+                          Text(provider.errorMessage),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              provider.initialize();
+                            },
+                            child: const Text('Riprova'),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ),
+                ),
+              if (_mapInitialized && _markers.isEmpty && provider.status == LoadingStatus.success)
+                Center(
+                  child: Card(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.info, size: 50, color: Colors.blue),
+                          const SizedBox(height: 8),
+                          const Text('Nessuna stazione trovata'),
+                          const SizedBox(height: 8),
+                          const Text('Prova a modificare i filtri'),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              _showFilterBottomSheet(context);
+                            },
+                            child: const Text('Filtri'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: _centerOnUserLocation,
+            tooltip: 'Vai alla mia posizione',
             child: const Icon(Icons.my_location),
           ),
         );
@@ -93,49 +157,95 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateMarkers(List<FuelStation> stations) {
-    final markers = <Marker>{};
-    
-    for (var station in stations) {
-      final marker = Marker(
-        markerId: MarkerId(station.id),
-        position: LatLng(station.latitude, station.longitude),
-        infoWindow: InfoWindow(
-          title: station.name,
-          snippet: station.brand,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailsScreen(station: station),
-              ),
-            );
-          },
-        ),
-        onTap: () {
-          _mapController?.showMarkerInfoWindow(MarkerId(station.id));
-        },
-      );
+    try {
+      print('Aggiornamento marker sulla mappa: ${stations.length} stazioni');
+      final markers = <Marker>{};
       
-      markers.add(marker);
+      for (var station in stations) {
+        final marker = Marker(
+          markerId: MarkerId(station.id),
+          position: LatLng(station.latitude, station.longitude),
+          infoWindow: InfoWindow(
+            title: station.name,
+            snippet: _getInfoSnippet(station),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DetailsScreen(station: station),
+                ),
+              );
+            },
+          ),
+          onTap: () {
+            try {
+              _mapController?.showMarkerInfoWindow(MarkerId(station.id));
+            } catch (e) {
+              print('Errore nel mostrare la finestra info del marker: $e');
+            }
+          },
+        );
+        
+        markers.add(marker);
+      }
+      
+      if (mounted) {
+        setState(() {
+          _markers = markers;
+        });
+      }
+    } catch (e) {
+      print('Errore nell\'aggiornamento dei marker: $e');
+    }
+  }
+  
+  String _getInfoSnippet(FuelStation station) {
+    final provider = Provider.of<FuelStationsProvider>(context, listen: false);
+    final fuelType = provider.selectedFuelType.toString().split('.').last;
+    
+    String snippet = station.brand;
+    
+    // Aggiungiamo il prezzo se disponibile
+    final price = station.getPriceByFuelType(fuelType);
+    if (price != null) {
+      snippet += ' - ${fuelType.toUpperCase()}: ${price.formattedPrice}';
     }
     
-    setState(() {
-      _markers = markers;
-    });
+    // Aggiungiamo la distanza se disponibile
+    if (station.distance != null) {
+      snippet += ' - ${station.distance!.toStringAsFixed(1)} km';
+    }
+    
+    return snippet;
   }
 
   void _centerOnUserLocation() {
-    final provider = Provider.of<FuelStationsProvider>(context, listen: false);
-    
-    if (provider.currentPosition != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(
-          LatLng(
-            provider.currentPosition!.latitude,
-            provider.currentPosition!.longitude,
+    try {
+      final provider = Provider.of<FuelStationsProvider>(context, listen: false);
+      
+      if (provider.currentPosition != null) {
+        print('Centratura mappa su posizione utente: ${provider.currentPosition!.latitude}, ${provider.currentPosition!.longitude}');
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            LatLng(
+              provider.currentPosition!.latitude,
+              provider.currentPosition!.longitude,
+            ),
+            14.0, // Livello di zoom
           ),
-        ),
-      );
+        );
+      } else {
+        print('Impossibile centrare: posizione utente non disponibile');
+        // Mostra un messaggio all'utente
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Posizione non disponibile'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Errore nella centratura sulla posizione utente: $e');
     }
   }
 
@@ -143,6 +253,7 @@ class _MapScreenState extends State<MapScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
       builder: (context) => const FilterBottomSheet(),
     );
   }

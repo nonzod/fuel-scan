@@ -11,18 +11,35 @@ void main() async {
   // Assicuriamoci che Flutter sia inizializzato
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inizializzazione del servizio chiavi
-  await KeysService.getInstance();
-  
-  // Inizializzazione di Hive per lo storage locale
-  await Hive.initFlutter();
-  
-  // Registriamo gli adapter di Hive per i nostri modelli
-  Hive.registerAdapter(FuelStationAdapter());
-  Hive.registerAdapter(FuelPriceAdapter());
-  
-  // Inizializziamo la box per le impostazioni
-  await Hive.openBox('settings');
+  try {
+    print('Inizializzazione app Fuel Scan...');
+    
+    // Inizializzazione del servizio chiavi
+    print('Inizializzazione servizio chiavi...');
+    await KeysService.getInstance();
+    
+    // Inizializzazione di Hive per lo storage locale
+    print('Inizializzazione Hive...');
+    await Hive.initFlutter();
+    
+    // Registriamo gli adapter di Hive per i nostri modelli
+    print('Registrazione adapter Hive...');
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(FuelStationAdapter());
+    }
+    
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(FuelPriceAdapter());
+    }
+    
+    // Inizializziamo la box per le impostazioni
+    print('Apertura box impostazioni...');
+    await Hive.openBox('settings');
+    
+    print('Inizializzazione completata con successo');
+  } catch (e) {
+    print('Errore durante l\'inizializzazione: $e');
+  }
   
   // Avviamo l'app
   runApp(
@@ -42,6 +59,7 @@ class FuelScanApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Fuel Scan',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,

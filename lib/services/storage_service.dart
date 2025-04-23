@@ -1,51 +1,78 @@
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:fuel_scan/models/fuel_station.dart';
 
 class StorageService {
-  static const String stationsBoxName = 'fuel_stations';
-  static const String settingsBoxName = 'settings';
-  static const String lastUpdateKey = 'last_update';
+  static const String _stationsBox = 'stations';
+  static const String _settingsBox = 'settings';
+  static const String _lastUpdateKey = 'last_update';
+  
+  // Aggiorna i dati ogni 24 ore
+  static const Duration _updateInterval = Duration(hours: 24);
   
   // Metodo per salvare le stazioni nel database locale
   Future<void> saveStations(List<FuelStation> stations) async {
-    final box = await Hive.openBox<FuelStation>(stationsBoxName);
-    
-    // Prima cancella tutti i dati
-    await box.clear();
-    
-    // Poi inserisci le nuove stazioni
-    await box.addAll(stations);
-    
-    // Aggiorna la data dell'ultimo aggiornamento
-    final settingsBox = await Hive.openBox(settingsBoxName);
-    await settingsBox.put(lastUpdateKey, DateTime.now().toIso8601String());
-    
-    await box.close();
+    try {
+      final box = await Hive.openBox<FuelStation>(_stationsBox);
+      
+      // Svuota il box e inserisci i nuovi dati
+      await box.clear();
+      await box.addAll(stations);
+      
+      // Aggiorna la data dell'ultimo aggiornamento
+      final settingsBox = await Hive.openBox(_settingsBox);
+      await settingsBox.put(_lastUpdateKey, DateTime.now().toIso8601String());
+      
+      await box.close();
+      
+      print('Salvate ${stations.length} stazioni nel database locale');
+    } catch (e) {
+      print('Errore nel salvataggio delle stazioni: $e');
+    }
   }
   
   // Metodo per caricare le stazioni dal database locale
   Future<List<FuelStation>> loadStations() async {
-    final box = await Hive.openBox<FuelStation>(stationsBoxName);
-    final stations = box.values.toList();
-    await box.close();
-    return stations;
+    try {
+      final box = await Hive.openBox<FuelStation>(_stationsBox);
+      
+      final stations = box.values.toList();
+      
+      await box.close();
+      return stations;
+    } catch (e) {
+      print('Errore nel caricamento delle stazioni: $e');
+      return []; // In caso di errore, restituisci una lista vuota
+    }
   }
   
   // Metodo per verificare se è necessario un aggiornamento
-  // Per ora, aggiorniamo ogni 24 ore
   Future<bool> needsUpdate() async {
-    final settingsBox = await Hive.openBox(settingsBoxName);
-    final lastUpdateStr = settingsBox.get(lastUpdateKey);
-    
-    if (lastUpdateStr == null) {
-      return true;
+    try {
+      final settingsBox = await Hive.openBox(_settingsBox);
+      final lastUpdateStr = settingsBox.get(_lastUpdateKey) as String?;
+      
+      if (lastUpdateStr == null) {
+        return true;
+      }
+      
+      final lastUpdate = DateTime.parse(lastUpdateStr);
+      final now = DateTime.now();
+      
+      return now.difference(lastUpdate) > _updateInterval;
+    } catch (e) {
+      print('Errore nel controllo della data di aggiornamento: $e');
+      return true; // In caso di errore, meglio aggiornare
     }
+  }
+  
+  // Metodo per cancellare tutti i dati
+  Future<void> clearAllData() async {
+    final stationsBox = await Hive.openBox<FuelStation>(_stationsBox);
+    final settingsBox = await Hive.openBox(_settingsBox);
     
-    final lastUpdate = DateTime.parse(lastUpdateStr);
-    final now = DateTime.now();
-    final difference = now.difference(lastUpdate);
+    await stationsBox.clear();
+    await settingsBox.clear();
     
-    return difference.inHours >= 24;
+    await stationsBox.close();
   }
 }
