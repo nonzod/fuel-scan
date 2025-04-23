@@ -33,7 +33,8 @@ dependencies:
   intl: ^0.18.1             # Per formattazione date e numeri
   provider: ^6.0.5          # Per la gestione dello stato
   path_provider: ^2.1.1     # Per accedere alle directory dell'app
-
+  url_launcher: ^6.2.5      # Per lanciare URL esterni (Google Maps)
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
