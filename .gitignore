@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Ignora i file di configurazione con chiavi API
+/assets/config/keys.json
+
+# Ignora il file strings.xml con la chiave API
+/android/app/src/main/res/values/strings.xml
+
+# Podfile.lock contiene versioni specifiche che potrebbero includere informazioni sensibili
+/ios/Podfile.lock

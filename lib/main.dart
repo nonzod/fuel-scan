@@ -5,10 +5,14 @@ import 'package:fuel_scan/models/fuel_station.dart';
 import 'package:fuel_scan/models/fuel_price.dart';
 import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/home_screen.dart';
+import 'package:fuel_scan/services/keys_service.dart';
 
 void main() async {
   // Assicuriamoci che Flutter sia inizializzato
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inizializzazione del servizio chiavi
+  await KeysService.getInstance();
   
   // Inizializzazione di Hive per lo storage locale
   await Hive.initFlutter();

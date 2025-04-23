@@ -1,16 +1,14 @@
 # fuel_scan
 
-A new Flutter project.
+Evviva
 
-## Getting Started
+## Configurazione
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Chiavi API
+1. Copia `assets/config/keys.json.example` in `assets/config/keys.json`
+2. Sostituisci il valore di `google_maps_api_key` con la tua chiave API di Google Maps
+3. Prima di compilare l'app:
+   - Esegui `dart scripts/plist_backup.dart backup` per fare un backup di Info.plist
+   - Esegui `dart scripts/pre_build.dart` per aggiornare le chiavi API
+4. Dopo il commit:
+   - Esegui `dart scripts/plist_backup.dart restore` per ripristinare Info.plist
