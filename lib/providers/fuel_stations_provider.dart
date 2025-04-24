@@ -27,6 +27,7 @@ class FuelStationsProvider with ChangeNotifier {
   SortOption _sortOption = SortOption.distance;
   double _maxDistance = 10.0; // km
   bool _onlySelfService = false;
+  bool _isInitializing = false;
   
   // Getters
   List<FuelStation> get stations => _stations;
@@ -39,9 +40,15 @@ class FuelStationsProvider with ChangeNotifier {
   SortOption get sortOption => _sortOption;
   double get maxDistance => _maxDistance;
   bool get onlySelfService => _onlySelfService;
+  bool get isInitializing => _isInitializing;
   
-  // Inizializzazione
+  // Inizializzazione - modificata per evitare chiamate a notifyListeners durante la build
   Future<void> initialize() async {
+    // Evitiamo di inizializzare più volte
+    if (_isInitializing) return;
+    _isInitializing = true;
+    
+    // Prima impostiamo lo stato di loading e notifichiamo
     _status = LoadingStatus.loading;
     notifyListeners();
     
@@ -62,7 +69,7 @@ class FuelStationsProvider with ChangeNotifier {
       
       if (needsUpdate || _stations.isEmpty) {
         print('Aggiornamento dati...');
-        await refreshData();
+        await _updateData(); // Usando un metodo privato per l'aggiornamento effettivo
       } else {
         // Aggiorna le distanze
         _stations = await _locationService.calculateDistances(
@@ -95,21 +102,13 @@ class FuelStationsProvider with ChangeNotifier {
       }
     }
     
+    _isInitializing = false;
     notifyListeners();
   }
   
-  // Aggiornamento dati dalle API
-  Future<void> refreshData() async {
-    _status = LoadingStatus.loading;
-    notifyListeners();
-    
+  // Metodo interno per aggiornamento dati
+  Future<void> _updateData() async {
     try {
-      print('Aggiornamento dati...');
-      
-      // Ottieni la posizione attuale
-      _currentPosition = await _locationService.getCurrentPosition();
-      print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
-      
       // Scarica i dati delle stazioni
       print('Scaricamento stazioni...');
       _stations = await _apiService.fetchFuelStations();
@@ -147,6 +146,26 @@ class FuelStationsProvider with ChangeNotifier {
       // Applica i filtri
       print('Applicazione filtri...');
       _applyFilters();
+    } catch (e) {
+      print('Errore durante l\'aggiornamento dati: $e');
+      throw e; // Rilanciamo l'eccezione per gestirla nel metodo chiamante
+    }
+  }
+  
+  // Aggiornamento dati dalle API (esposto pubblicamente)
+  Future<void> refreshData() async {
+    _status = LoadingStatus.loading;
+    notifyListeners();
+    
+    try {
+      print('Aggiornamento dati...');
+      
+      // Ottieni la posizione attuale
+      _currentPosition = await _locationService.getCurrentPosition();
+      print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      
+      // Esegui l'aggiornamento dei dati
+      await _updateData();
       
       _status = LoadingStatus.success;
       print('Aggiornamento completato con successo');

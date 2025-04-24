@@ -14,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _initialized = false;
+  late FuelStationsProvider _provider;
   final List<Widget> _screens = [
     const MapScreen(),
     const ListScreen(),
@@ -22,18 +23,27 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Inizializzazione dei dati
-    _initializeData();
+    // Posticipa l'inizializzazione dopo il build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeData();
+    });
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Otteniamo l'istanza del provider qui, così da averla disponibile per tutto il ciclo di vita del widget
+    _provider = Provider.of<FuelStationsProvider>(context, listen: false);
   }
   
   Future<void> _initializeData() async {
     try {
-      final provider = context.read<FuelStationsProvider>();
-      
-      if (provider.status == LoadingStatus.idle) {
-        await provider.initialize();
+      // Inizializzazione dei dati solo se necessario
+      if (_provider.status == LoadingStatus.idle) {
+        await _provider.initialize();
       }
       
+      // Aggiorniamo lo stato UI solo quando l'inizializzazione è completa
       if (mounted) {
         setState(() {
           _initialized = true;
@@ -52,21 +62,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _initialized 
-        ? IndexedStack(
+      body: Consumer<FuelStationsProvider>(
+        builder: (context, provider, child) {
+          // Usiamo i dati del provider per decidere cosa mostrare
+          if (!_initialized || provider.status == LoadingStatus.loading) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Caricamento stazioni di servizio...'),
+                ],
+              ),
+            );
+          }
+          
+          return IndexedStack(
             index: _selectedIndex,
             children: _screens,
-          )
-        : const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Caricamento stazioni di servizio...'),
-              ],
-            ),
-          ),
+          );
+        },
+      ),
       bottomNavigationBar: _initialized
         ? BottomNavigationBar(
             currentIndex: _selectedIndex,

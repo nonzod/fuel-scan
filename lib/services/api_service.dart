@@ -60,7 +60,7 @@ class ApiService {
     }
   }
 
-  // Metodo migliorato per il parsing del CSV delle stazioni
+  // Metodo migliorato per il parsing del CSV delle stazioni con maggiore robustezza
   List<FuelStation> _parseStationsCSV(String csvData) {
     try {
       // Dividiamo per righe e saltiamo l'intestazione
@@ -81,33 +81,44 @@ class ApiService {
           // Utilizziamo un parser CSV più robusto
           final fields = _parseCSVLineRobust(line, separator: ';');
           
+          // Verifichiamo che abbiamo abbastanza campi
           if (fields.length < 8) {
             print('Riga CSV stazione malformata (campi insufficienti): ${fields.length} campi - $line');
             continue;
           }
           
-          final id = fields[0];
-          final name = fields[1];
-          final brand = fields[2];
-          final address = fields.length > 5 ? fields[5] : '';
-          final city = fields.length > 6 ? fields[6] : '';
-          final province = fields.length > 7 ? fields[7] : '';
+          final id = fields[0].trim();
+          final name = fields[1].trim();
+          final brand = fields[2].trim();
+          final address = fields.length > 5 ? fields[5].trim() : '';
+          final city = fields.length > 6 ? fields[6].trim() : '';
+          final province = fields.length > 7 ? fields[7].trim() : '';
           
-          // Gestione più robusta delle coordinate
+          // Gestione più robusta delle coordinate, correzione per valori NULL
           double? latitude;
           double? longitude;
           
           if (fields.length > 8) {
-            latitude = double.tryParse(fields[8].replaceAll(',', '.'));
+            final latStr = fields[8].trim().toUpperCase();
+            latitude = latStr == "NULL" ? null : double.tryParse(latStr.replaceAll(',', '.'));
           }
           
           if (fields.length > 9) {
-            longitude = double.tryParse(fields[9].replaceAll(',', '.'));
+            final longStr = fields[9].trim().toUpperCase();
+            longitude = longStr == "NULL" ? null : double.tryParse(longStr.replaceAll(',', '.'));
           }
           
-          if (id.isEmpty || (latitude == null || longitude == null)) {
-            print('Coordinate mancanti o ID vuoto: $line');
+          // Validazione
+          if (id.isEmpty) {
+            print('ID vuoto, ignorato: $line');
             continue;
+          }
+          
+          if (latitude == null || longitude == null) {
+            print('Coordinate mancanti o non valide, usando valori di default: $line');
+            // Usiamo coordinate di default per Roma invece di saltare la stazione
+            latitude = latitude ?? 41.9028;
+            longitude = longitude ?? 12.4964;
           }
           
           stations.add(FuelStation(
@@ -159,16 +170,16 @@ class ApiService {
             continue;
           }
           
-          final stationId = fields[0];
+          final stationId = fields[0].trim();
           if (stationId.isEmpty) {
             print('ID stazione mancante: $line');
             continue;
           }
           
-          String id = fields.length > 1 ? fields[1] : '';
-          String fuelType = fields.length > 2 ? fields[2] : '';
-          String priceStr = fields.length > 3 ? fields[3].replaceAll(',', '.') : '0';
-          String serviceType = fields.length > 4 ? fields[4] : '';
+          String id = fields.length > 1 ? fields[1].trim() : '';
+          String fuelType = fields.length > 2 ? fields[2].trim() : '';
+          String priceStr = fields.length > 3 ? fields[3].trim().replaceAll(',', '.') : '0';
+          String serviceType = fields.length > 4 ? fields[4].trim() : '';
           
           double priceValue = double.tryParse(priceStr) ?? 0;
           bool isSelf = serviceType.toLowerCase() == 'self';
@@ -178,12 +189,24 @@ class ApiService {
             continue;
           }
           
+          DateTime updateDate;
+          try {
+            if (fields.length > 5) {
+              final dateStr = fields[5].trim();
+              updateDate = DateTime.parse(dateStr);
+            } else {
+              updateDate = DateTime.now();
+            }
+          } catch (e) {
+            updateDate = DateTime.now();
+          }
+          
           final fuelPrice = FuelPrice(
             id: id,
             fuelType: fuelType,
             price: priceValue,
             isSelf: isSelf,
-            updatedAt: DateTime.now(),
+            updatedAt: updateDate,
           );
           
           if (!prices.containsKey(stationId)) {
@@ -245,7 +268,15 @@ class ApiService {
     // Aggiungi l'ultimo campo
     result.add(currentField);
     
-    return result.map((field) => field.trim()).toList();
+    // Rimuoviamo gli eventuali spazi e virgolette iniziali/finali
+    return result.map((field) {
+      field = field.trim();
+      // Rimuoviamo le virgolette iniziali e finali se presenti
+      if (field.startsWith('"') && field.endsWith('"') && field.length >= 2) {
+        field = field.substring(1, field.length - 1);
+      }
+      return field;
+    }).toList();
   }
   
   // Dati di test per il debug

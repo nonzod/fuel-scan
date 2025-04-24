@@ -47,10 +47,10 @@ class FuelStation extends HiveObject {
     required this.province,
     required this.latitude,
     required this.longitude,
-    this.prices = const [],
+    List<FuelPrice>? prices,  // Modificato da const a opzionale
     this.lastUpdate,
     this.distance,
-  });
+  }) : prices = prices != null ? List<FuelPrice>.from(prices) : [];  // Crea una lista mutabile
 
   // Metodo per trovare il prezzo di un tipo specifico di carburante
   FuelPrice? getPriceByFuelType(String fuelType) {
