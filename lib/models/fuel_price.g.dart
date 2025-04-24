@@ -17,27 +17,24 @@ class FuelPriceAdapter extends TypeAdapter<FuelPrice> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return FuelPrice(
-      id: fields[0] as String,
-      fuelType: fields[1] as String,
-      price: fields[2] as double,
-      isSelf: fields[3] as bool,
-      updatedAt: fields[4] as DateTime,
+      fuelType: fields[0] as String,
+      price: fields[1] as double,
+      isSelf: fields[2] as bool,
+      updatedAt: fields[3] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, FuelPrice obj) {
     writer
-      ..writeByte(5)
-      ..writeByte(0)
-      ..write(obj.id)
-      ..writeByte(1)
-      ..write(obj.fuelType)
-      ..writeByte(2)
-      ..write(obj.price)
-      ..writeByte(3)
-      ..write(obj.isSelf)
       ..writeByte(4)
+      ..writeByte(0)
+      ..write(obj.fuelType)
+      ..writeByte(1)
+      ..write(obj.price)
+      ..writeByte(2)
+      ..write(obj.isSelf)
+      ..writeByte(3)
       ..write(obj.updatedAt);
   }
 

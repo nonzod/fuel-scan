@@ -25,7 +25,7 @@ class FuelStationAdapter extends TypeAdapter<FuelStation> {
       province: fields[5] as String,
       latitude: fields[6] as double,
       longitude: fields[7] as double,
-      prices: (fields[8] as List).cast<FuelPrice>(),
+      prices: (fields[8] as List?)?.cast<FuelPrice>(),
       lastUpdate: fields[9] as DateTime?,
     );
   }

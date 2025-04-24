@@ -66,6 +66,14 @@ class StationListItem extends StatelessWidget {
                         color: _getPriceColor(price),
                       ),
                     ),
+                  if (price != null)
+                    Text(
+                      price.serviceType,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
                   if (station.distance != null)
                     Text(
                       '${station.distance!.toStringAsFixed(2)} km',

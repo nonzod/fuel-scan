@@ -6,22 +6,18 @@ part 'fuel_price.g.dart';
 @HiveType(typeId: 1)
 class FuelPrice extends HiveObject {
   @HiveField(0)
-  final String id;
+  final String fuelType; // Benzina, Gasolio, GPL, etc.
 
   @HiveField(1)
-  final String fuelType; // Benzina, Diesel, GPL, etc.
-
-  @HiveField(2)
   final double price;
 
-  @HiveField(3)
+  @HiveField(2)
   final bool isSelf; // Self service o servito
 
-  @HiveField(4)
+  @HiveField(3)
   final DateTime updatedAt;
 
   FuelPrice({
-    required this.id,
     required this.fuelType,
     required this.price,
     required this.isSelf,
@@ -31,7 +27,6 @@ class FuelPrice extends HiveObject {
   // Factory constructor per creare un oggetto FuelPrice da JSON
   factory FuelPrice.fromJson(Map<String, dynamic> json) {
     return FuelPrice(
-      id: json['idCarburante'] ?? '',
       fuelType: json['descCarburante'] ?? '',
       price: double.tryParse(json['prezzo'] ?? '0') ?? 0,
       isSelf: (json['isSelf'] ?? 'true').toLowerCase() == 'true',

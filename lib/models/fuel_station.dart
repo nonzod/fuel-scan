@@ -47,16 +47,36 @@ class FuelStation extends HiveObject {
     required this.province,
     required this.latitude,
     required this.longitude,
-    List<FuelPrice>? prices,  // Modificato da const a opzionale
+    List<FuelPrice>? prices,
     this.lastUpdate,
     this.distance,
-  }) : prices = prices != null ? List<FuelPrice>.from(prices) : [];  // Crea una lista mutabile
+  }) : prices = prices != null ? List<FuelPrice>.from(prices) : [];
 
   // Metodo per trovare il prezzo di un tipo specifico di carburante
   FuelPrice? getPriceByFuelType(String fuelType) {
     try {
-      return prices.firstWhere((price) => price.fuelType == fuelType);
+      // Cerca in modo case-insensitive e considera prezzi self-service se disponibili
+      final selfPrices = prices.where(
+        (price) => price.fuelType.toLowerCase().contains(fuelType.toLowerCase()) && price.isSelf
+      ).toList();
+      
+      // Se ci sono prezzi self-service, restituisci il più basso
+      if (selfPrices.isNotEmpty) {
+        return selfPrices.reduce((curr, next) => curr.price < next.price ? curr : next);
+      }
+      
+      // Altrimenti, cerca tra tutti i prezzi di quel tipo di carburante
+      final allPrices = prices.where(
+        (price) => price.fuelType.toLowerCase().contains(fuelType.toLowerCase())
+      ).toList();
+      
+      if (allPrices.isNotEmpty) {
+        return allPrices.reduce((curr, next) => curr.price < next.price ? curr : next);
+      }
+      
+      return null;
     } catch (e) {
+      print('Errore nella ricerca del prezzo: $e');
       return null;
     }
   }

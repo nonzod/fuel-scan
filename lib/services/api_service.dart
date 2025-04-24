@@ -63,14 +63,18 @@ class ApiService {
   // Metodo migliorato per il parsing del CSV delle stazioni con maggiore robustezza
   List<FuelStation> _parseStationsCSV(String csvData) {
     try {
-      // Dividiamo per righe e saltiamo l'intestazione
+      // Dividiamo per righe e saltiamo le prime due righe (titolo e intestazione)
       final lines = csvData.split('\n');
-      if (lines.length <= 1) {
+      if (lines.length <= 2) {
         print('CSV stazioni vuoto o malformato');
         return [];
       }
       
-      lines.removeAt(0); // Rimuoviamo l'intestazione
+      // Rimuoviamo le prime due righe (titolo e intestazione)
+      lines.removeAt(0); // Rimuove il titolo
+      if (lines.isNotEmpty) {
+        lines.removeAt(0); // Rimuove l'intestazione
+      }
       
       final stations = <FuelStation>[];
       
@@ -149,14 +153,20 @@ class ApiService {
     try {
       final prices = <String, List<FuelPrice>>{};
       
-      // Dividiamo per righe e saltiamo l'intestazione
+      // Dividiamo per righe e saltiamo le prime due righe (titolo e intestazione)
       final lines = csvData.split('\n');
-      if (lines.length <= 1) {
+      if (lines.length <= 2) {
         print('CSV prezzi vuoto o malformato');
         return prices;
       }
       
-      lines.removeAt(0); // Rimuoviamo l'intestazione
+      // Rimuoviamo le prime due righe (titolo e intestazione)
+      lines.removeAt(0); // Rimuove il titolo
+      if (lines.isNotEmpty) {
+        lines.removeAt(0); // Rimuove l'intestazione
+      }
+      
+      print('Analisi di ${lines.length} righe di prezzi...');
       
       for (var line in lines) {
         if (line.trim().isEmpty) continue;
@@ -165,7 +175,7 @@ class ApiService {
           // Utilizziamo un parser CSV più robusto
           final fields = _parseCSVLineRobust(line, separator: ';');
           
-          if (fields.length < 5) {
+          if (fields.length < 4) {
             print('Riga CSV prezzo malformata (campi insufficienti): ${fields.length} campi - $line');
             continue;
           }
@@ -176,23 +186,24 @@ class ApiService {
             continue;
           }
           
-          String id = fields.length > 1 ? fields[1].trim() : '';
-          String fuelType = fields.length > 2 ? fields[2].trim() : '';
-          String priceStr = fields.length > 3 ? fields[3].trim().replaceAll(',', '.') : '0';
-          String serviceType = fields.length > 4 ? fields[4].trim() : '';
+          // Ricaviamo i dati dai campi appropriati
+          String fuelType = fields.length > 1 ? fields[1].trim() : '';
+          String priceStr = fields.length > 2 ? fields[2].trim().replaceAll(',', '.') : '0';
+          String isSelfStr = fields.length > 3 ? fields[3].trim().toLowerCase() : 'true';
           
           double priceValue = double.tryParse(priceStr) ?? 0;
-          bool isSelf = serviceType.toLowerCase() == 'self';
+          // Interpretiamo correttamente il campo isSelf
+          bool isSelf = isSelfStr == '1' || isSelfStr == 'true' || isSelfStr == 'self';
           
-          if (id.isEmpty || fuelType.isEmpty) {
-            print('Dati carburante incompleti: $line');
+          if (fuelType.isEmpty) {
+            print('Tipo carburante incompleto: $line');
             continue;
           }
           
           DateTime updateDate;
           try {
-            if (fields.length > 5) {
-              final dateStr = fields[5].trim();
+            if (fields.length > 4) {
+              final dateStr = fields[4].trim();
               updateDate = DateTime.parse(dateStr);
             } else {
               updateDate = DateTime.now();
@@ -202,7 +213,6 @@ class ApiService {
           }
           
           final fuelPrice = FuelPrice(
-            id: id,
             fuelType: fuelType,
             price: priceValue,
             isSelf: isSelf,
@@ -293,14 +303,12 @@ class ApiService {
         longitude: 12.4964,
         prices: [
           FuelPrice(
-            id: '1',
             fuelType: 'Benzina',
             price: 1.799,
             isSelf: true,
             updatedAt: DateTime.now(),
           ),
           FuelPrice(
-            id: '2',
             fuelType: 'Gasolio',
             price: 1.699,
             isSelf: true,
@@ -319,14 +327,12 @@ class ApiService {
         longitude: 12.5000,
         prices: [
           FuelPrice(
-            id: '3',
             fuelType: 'Benzina',
             price: 1.849,
             isSelf: true,
             updatedAt: DateTime.now(),
           ),
           FuelPrice(
-            id: '4',
             fuelType: 'Gasolio',
             price: 1.749,
             isSelf: true,
@@ -342,14 +348,12 @@ class ApiService {
     return {
       '1': [
         FuelPrice(
-          id: '1',
           fuelType: 'Benzina',
           price: 1.799,
           isSelf: true,
           updatedAt: DateTime.now(),
         ),
         FuelPrice(
-          id: '2',
           fuelType: 'Gasolio',
           price: 1.699,
           isSelf: true,
@@ -358,14 +362,12 @@ class ApiService {
       ],
       '2': [
         FuelPrice(
-          id: '3',
           fuelType: 'Benzina',
           price: 1.849,
           isSelf: true,
           updatedAt: DateTime.now(),
         ),
         FuelPrice(
-          id: '4',
           fuelType: 'Gasolio',
           price: 1.749,
           isSelf: true,
