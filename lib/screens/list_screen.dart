@@ -5,6 +5,8 @@ import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/details_screen.dart';
 import 'package:fuel_scan/widgets/filter_bottom_sheet.dart';
 import 'package:fuel_scan/widgets/station_list_item.dart';
+import 'package:fuel_scan/widgets/banner_ad_widget.dart';
+import 'package:fuel_scan/services/ad_service.dart';
 
 class ListScreen extends StatelessWidget {
   const ListScreen({super.key});
@@ -50,6 +52,8 @@ class ListScreen extends StatelessWidget {
               Expanded(
                 child: _buildStationsList(context, provider),
               ),
+              // Banner nella parte inferiore
+              const BannerAdWidget(),
             ],
           ),
         );
@@ -106,7 +110,10 @@ class ListScreen extends StatelessWidget {
     );
   }
 
-  void _navigateToDetails(BuildContext context, FuelStation station) {
+  void _navigateToDetails(BuildContext context, FuelStation station) async {
+    // Mostriamo un interstiziale prima di navigare (occasionalmente)
+    await AdService().showInterstitialAd();
+    
     Navigator.push(
       context,
       MaterialPageRoute(

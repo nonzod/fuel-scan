@@ -1,3 +1,5 @@
 {
-  "google_maps_api_key": "INSERISCI_QUI_LA_TUA_CHIAVE_API"
+  "google_maps_api_key": "INSERISCI_QUI_LA_TUA_CHIAVE_API",
+  "admob_android_app_id": "INSERISCI_QUI_IL_TUO_ID_APP_ADMOB_ANDROID",
+  "admob_ios_app_id": "INSERISCI_QUI_IL_TUO_ID_APP_ADMOB_IOS"
 }

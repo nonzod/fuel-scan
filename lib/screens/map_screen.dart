@@ -5,6 +5,8 @@ import 'package:fuel_scan/models/fuel_station.dart';
 import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/details_screen.dart';
 import 'package:fuel_scan/widgets/filter_bottom_sheet.dart';
+import 'package:fuel_scan/widgets/banner_ad_widget.dart';
+import 'package:fuel_scan/services/ad_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -71,108 +73,116 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
           ),
-          body: Stack(
+          body: Column(
             children: [
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: provider.currentPosition != null
-                      ? LatLng(
-                          provider.currentPosition!.latitude,
-                          provider.currentPosition!.longitude)
-                      : const LatLng(41.9028, 12.4964), // Roma come fallback
-                  zoom: 12.0,
+              Expanded(
+                child: Stack(
+                  children: [
+                    GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: provider.currentPosition != null
+                            ? LatLng(
+                                provider.currentPosition!.latitude,
+                                provider.currentPosition!.longitude)
+                            : const LatLng(41.9028, 12.4964), // Roma come fallback
+                        zoom: 12.0,
+                      ),
+                      onMapCreated: (controller) {
+                        _mapController = controller;
+                        setState(() {
+                          _mapInitialized = true;
+                        });
+                        
+                        if (provider.filteredStations.isNotEmpty) {
+                          // Aggiorniamo i marker in modo sicuro
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _updateMarkers(provider.filteredStations);
+                          });
+                        }
+                        
+                        if (provider.currentPosition != null) {
+                          _centerOnUserLocation();
+                        }
+                      },
+                      markers: _markers,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: true,
+                      mapToolbarEnabled: true,
+                      compassEnabled: true,
+                      zoomControlsEnabled: true,
+                    ),
+                    if (provider.status == LoadingStatus.loading)
+                      const Center(
+                        child: Card(
+                          color: Colors.white,
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 8),
+                                Text('Caricamento...'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (provider.status == LoadingStatus.error)
+                      Center(
+                        child: Card(
+                          color: Colors.white,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.error, size: 50, color: Colors.red),
+                                const SizedBox(height: 8),
+                                Text(provider.errorMessage),
+                                const SizedBox(height: 8),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    provider.initialize();
+                                  },
+                                  child: const Text('Riprova'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_mapInitialized && _markers.isEmpty && provider.status == LoadingStatus.success)
+                      Center(
+                        child: Card(
+                          color: Colors.white,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.info, size: 50, color: Colors.blue),
+                                const SizedBox(height: 8),
+                                const Text('Nessuna stazione trovata'),
+                                const SizedBox(height: 8),
+                                const Text('Prova a modificare i filtri'),
+                                const SizedBox(height: 8),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    _showFilterBottomSheet(context);
+                                  },
+                                  child: const Text('Filtri'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  setState(() {
-                    _mapInitialized = true;
-                  });
-                  
-                  if (provider.filteredStations.isNotEmpty) {
-                    // Aggiorniamo i marker in modo sicuro
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _updateMarkers(provider.filteredStations);
-                    });
-                  }
-                  
-                  if (provider.currentPosition != null) {
-                    _centerOnUserLocation();
-                  }
-                },
-                markers: _markers,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: true,
-                mapToolbarEnabled: true,
-                compassEnabled: true,
-                zoomControlsEnabled: true,
               ),
-              if (provider.status == LoadingStatus.loading)
-                const Center(
-                  child: Card(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 8),
-                          Text('Caricamento...'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              if (provider.status == LoadingStatus.error)
-                Center(
-                  child: Card(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error, size: 50, color: Colors.red),
-                          const SizedBox(height: 8),
-                          Text(provider.errorMessage),
-                          const SizedBox(height: 8),
-                          ElevatedButton(
-                            onPressed: () {
-                              provider.initialize();
-                            },
-                            child: const Text('Riprova'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              if (_mapInitialized && _markers.isEmpty && provider.status == LoadingStatus.success)
-                Center(
-                  child: Card(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.info, size: 50, color: Colors.blue),
-                          const SizedBox(height: 8),
-                          const Text('Nessuna stazione trovata'),
-                          const SizedBox(height: 8),
-                          const Text('Prova a modificare i filtri'),
-                          const SizedBox(height: 8),
-                          ElevatedButton(
-                            onPressed: () {
-                              _showFilterBottomSheet(context);
-                            },
-                            child: const Text('Filtri'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              // Banner nella parte inferiore
+              const BannerAdWidget(),
             ],
           ),
           floatingActionButton: FloatingActionButton(
@@ -198,12 +208,7 @@ class _MapScreenState extends State<MapScreen> {
             title: station.name,
             snippet: _getInfoSnippet(station),
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DetailsScreen(station: station),
-                ),
-              );
+              _navigateToDetails(station);
             },
           ),
           onTap: () {
@@ -285,5 +290,19 @@ class _MapScreenState extends State<MapScreen> {
       enableDrag: true,
       builder: (context) => const FilterBottomSheet(),
     );
+  }
+  
+  void _navigateToDetails(FuelStation station) async {
+    // Mostriamo un interstiziale prima di navigare (occasionalmente)
+    await AdService().showInterstitialAd();
+    
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DetailsScreen(station: station),
+        ),
+      );
+    }
   }
 }

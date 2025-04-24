@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/map_screen.dart';
 import 'package:fuel_scan/screens/list_screen.dart';
+import 'package:fuel_scan/screens/premium_screen.dart';
+import 'package:fuel_scan/services/premium_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _initialized = false;
+  bool _isPremium = false;
   late FuelStationsProvider _provider;
   final List<Widget> _screens = [
     const MapScreen(),
@@ -23,10 +26,19 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Controlla lo stato premium
+    _checkPremiumStatus();
     // Posticipa l'inizializzazione dopo il build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeData();
     });
+  }
+  
+  Future<void> _checkPremiumStatus() async {
+    _isPremium = await PremiumService().checkPremiumStatus();
+    if (mounted) {
+      setState(() {});
+    }
   }
   
   @override
@@ -96,6 +108,26 @@ class _HomeScreenState extends State<HomeScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.list),
                 label: 'Lista',
+              ),
+            ],
+          )
+        : null,
+      appBar: _initialized 
+        ? AppBar(
+            title: const Text('Fuel Scan'),
+            actions: [
+              IconButton(
+                icon: Icon(_isPremium ? Icons.workspace_premium : Icons.star_border),
+                onPressed: () {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => const PremiumScreen())
+                  ).then((_) {
+                    // Aggiorna lo stato premium quando si torna dalla schermata premium
+                    _checkPremiumStatus();
+                  });
+                },
+                tooltip: _isPremium ? 'Premium attivo' : 'Passa a Premium',
               ),
             ],
           )
