@@ -148,7 +148,7 @@ class FuelStationsProvider with ChangeNotifier {
       _applyFilters();
     } catch (e) {
       print('Errore durante l\'aggiornamento dati: $e');
-      throw e; // Rilanciamo l'eccezione per gestirla nel metodo chiamante
+      rethrow; // Rilanciamo l'eccezione per gestirla nel metodo chiamante
     }
   }
   
