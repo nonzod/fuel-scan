@@ -17,7 +17,7 @@ class ListScreen extends StatelessWidget {
       builder: (context, provider, child) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Fuel Scan - Lista'),
+            title: const Text('Lista'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),

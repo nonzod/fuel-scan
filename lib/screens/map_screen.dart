@@ -57,7 +57,7 @@ class _MapScreenState extends State<MapScreen> {
         
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Fuel Scan - Mappa'),
+            title: const Text('Mappa'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
