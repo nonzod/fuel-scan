@@ -50,13 +50,14 @@ void main(List<String> args) async {
       keysData['google_maps_api_key'] = 'YOUR_GOOGLE_MAPS_API_KEY';
     }
     
-    // Salva il file
-    await keysFile.writeAsString(json.encode(keysData, indent: 2));
+    // Salva il file con indentazione leggibile
+    final encoder = JsonEncoder.withIndent('  ');
+    await keysFile.writeAsString(encoder.convert(keysData));
     
     print('File keys.json aggiornato con successo!');
     print('Percorso: ${keysFile.absolute.path}');
     print('Contenuto:');
-    print(json.encode(keysData, indent: 2));
+    print(encoder.convert(keysData));
   } catch (e) {
     print('Errore durante la generazione del file keys.json: $e');
     exit(1);
