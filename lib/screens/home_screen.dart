@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/map_screen.dart';
 import 'package:fuel_scan/screens/list_screen.dart';
-import 'package:fuel_scan/screens/premium_screen.dart';
 import 'package:fuel_scan/services/premium_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -115,21 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: _initialized 
         ? AppBar(
             title: const Text('Fuel Scan'),
-            actions: [
-              IconButton(
-                icon: Icon(_isPremium ? Icons.workspace_premium : Icons.star_border),
-                onPressed: () {
-                  Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => const PremiumScreen())
-                  ).then((_) {
-                    // Aggiorna lo stato premium quando si torna dalla schermata premium
-                    _checkPremiumStatus();
-                  });
-                },
-                tooltip: _isPremium ? 'Premium attivo' : 'Passa a Premium',
-              ),
-            ],
           )
         : null,
     );
