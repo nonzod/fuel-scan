@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fuel_scan/models/fuel_station.dart';
 import 'package:fuel_scan/models/fuel_price.dart';
+import 'package:fuel_scan/widgets/banner_ad_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DetailsScreen extends StatelessWidget {
@@ -18,18 +19,26 @@ class DetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(station.name),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoCard(context),
-            const SizedBox(height: 16),
-            _buildPricesCard(context),
-            const SizedBox(height: 16),
-            _buildNavigationButton(context),
-          ],
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoCard(context),
+                  const SizedBox(height: 16),
+                  _buildPricesCard(context),
+                  const SizedBox(height: 16),
+                  _buildNavigationButton(context),
+                ],
+              ),
+            ),
+          ),
+          // Banner in fondo alla schermata
+          const BannerAdWidget(),
+        ],
       ),
     );
   }

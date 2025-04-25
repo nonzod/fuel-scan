@@ -6,6 +6,7 @@ import 'package:fuel_scan/models/fuel_price.dart';
 import 'package:fuel_scan/providers/fuel_stations_provider.dart';
 import 'package:fuel_scan/screens/home_screen.dart';
 import 'package:fuel_scan/services/keys_service.dart';
+import 'package:fuel_scan/services/ad_service.dart';
 
 void main() async {
   // Assicuriamoci che Flutter sia inizializzato
@@ -35,6 +36,10 @@ void main() async {
     // Inizializziamo la box per le impostazioni
     print('Apertura box impostazioni...');
     await Hive.openBox('settings');
+    
+    // Inizializzazione AdMob
+    print('Inizializzazione AdMob...');
+    await AdService().initialize();
     
     print('Inizializzazione completata con successo');
   } catch (e) {

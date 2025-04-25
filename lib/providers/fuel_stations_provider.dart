@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:fuel_scan/models/fuel_station.dart';
-import 'package:fuel_scan/models/fuel_price.dart';
 import 'package:fuel_scan/services/api_service.dart';
 import 'package:fuel_scan/services/location_service.dart';
 import 'package:fuel_scan/services/storage_service.dart';
