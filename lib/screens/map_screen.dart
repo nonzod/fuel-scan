@@ -19,41 +19,18 @@ class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   bool _mapInitialized = false;
-  List<FuelStation> _lastStations = [];
-  
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Ottenere le stazioni filtrate in modo sicuro
-    final provider = Provider.of<FuelStationsProvider>(context, listen: false);
-    if (provider.filteredStations.isNotEmpty) {
-      // Se le stazioni sono diverse dall'ultima volta, aggiorna i marker
-      // dopo che il frame è stato costruito
-      if (_areStationsDifferent(provider.filteredStations, _lastStations)) {
-        _lastStations = List.from(provider.filteredStations);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _updateMarkers(_lastStations);
-        });
-      }
-    }
-  }
-  
-  bool _areStationsDifferent(List<FuelStation> newStations, List<FuelStation> oldStations) {
-    if (newStations.length != oldStations.length) return true;
-    
-    // Controllo superficiale, solo IDs per efficienza
-    for (int i = 0; i < newStations.length; i++) {
-      if (newStations[i].id != oldStations[i].id) return true;
-    }
-    
-    return false;
-  }
   
   @override
   Widget build(BuildContext context) {
     return Consumer<FuelStationsProvider>(
       builder: (context, provider, child) {
-        // Non aggiorniamo più i marker qui, ma usiamo didChangeDependencies
+        // Aggiorniamo i marker ogni volta che il provider cambia
+        if (_mapInitialized && provider.filteredStations.isNotEmpty) {
+          // Aggiorniamo i marker in modo sicuro dopo che il frame è stato renderizzato
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _updateMarkers(provider.filteredStations);
+          });
+        }
         
         return Scaffold(
           appBar: AppBar(
@@ -93,11 +70,9 @@ class _MapScreenState extends State<MapScreen> {
                           _mapInitialized = true;
                         });
                         
+                        // Aggiorniamo i marker subito se ci sono stazioni filtrate
                         if (provider.filteredStations.isNotEmpty) {
-                          // Aggiorniamo i marker in modo sicuro
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _updateMarkers(provider.filteredStations);
-                          });
+                          _updateMarkers(provider.filteredStations);
                         }
                         
                         if (provider.currentPosition != null) {
