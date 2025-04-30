@@ -24,46 +24,67 @@ class AdService {
   InterstitialAd? _interstitialAd;
   bool _isInterstitialAdReady = false;
   
+  // Flag per tracciare l'inizializzazione
+  bool _isInitialized = false;
+  
   // Inizializza il servizio
   Future<void> initialize() async {
-    // Inizializza il servizio premium
-    await _premiumService.initialize();
+    // Evita inizializzazione duplicata
+    if (_isInitialized) return;
     
-    // Inizializza Mobile Ads SDK solo se l'utente non è premium
-    if (!_premiumService.isPremium) {
-      await MobileAds.instance.initialize();
+    try {
+      // Inizializza il servizio premium
+      await _premiumService.initialize();
       
-      // Imposta gli ID degli annunci per test o produzione
-      if (kDebugMode) {
-        // ID di test
-        _bannerAdUnitId = Platform.isAndroid
-            ? 'ca-app-pub-3940256099942544/6300978111'
-            : 'ca-app-pub-3940256099942544/2934735716';
+      // Inizializza Mobile Ads SDK solo se l'utente non è premium
+      if (!_premiumService.isPremium) {
+        await MobileAds.instance.initialize();
         
-        _interstitialAdUnitId = Platform.isAndroid
-            ? 'ca-app-pub-3940256099942544/1033173712'
-            : 'ca-app-pub-3940256099942544/4411468910';
-      } else {
-        // ID di produzione (da sostituire con quelli reali)
-        _bannerAdUnitId = Platform.isAndroid
-            ? 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'
-            : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy';
+        // Imposta gli ID degli annunci per test o produzione
+        if (kDebugMode) {
+          // ID di test
+          _bannerAdUnitId = Platform.isAndroid
+              ? 'ca-app-pub-3940256099942544/6300978111'
+              : 'ca-app-pub-3940256099942544/2934735716';
+          
+          _interstitialAdUnitId = Platform.isAndroid
+              ? 'ca-app-pub-3940256099942544/1033173712'
+              : 'ca-app-pub-3940256099942544/4411468910';
+        } else {
+          // ID di produzione (da sostituire con quelli reali)
+          _bannerAdUnitId = Platform.isAndroid
+              ? 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'
+              : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy';
+          
+          _interstitialAdUnitId = Platform.isAndroid
+              ? 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'
+              : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy';
+        }
         
-        _interstitialAdUnitId = Platform.isAndroid
-            ? 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'
-            : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy';
+        // Precarica un annuncio interstiziale in background
+        _loadInterstitialAd();
       }
       
-      // Precarica un annuncio interstiziale
-      _loadInterstitialAd();
+      _isInitialized = true;
+    } catch (e) {
+      print('Errore nell\'inizializzazione di AdService: $e');
+      // Anche in caso di errore, consideriamo il servizio inizializzato
+      // per evitare di tentare ripetutamente
+      _isInitialized = true;
     }
   }
   
-  // Crea un banner
+  // Crea un banner in modo lazy, inizializzando se necessario
   BannerAd? createBannerAd() {
     // Non mostrare annunci se l'utente è premium
     if (_premiumService.isPremium) {
       return null;
+    }
+    
+    // Se non ancora inizializzato, tenta l'inizializzazione
+    if (!_isInitialized) {
+      initialize();
+      return null; // Restituisci null per ora, il banner verrà creato al prossimo tentativo
     }
     
     return BannerAd(
@@ -84,6 +105,8 @@ class AdService {
   
   // Carica un annuncio interstiziale
   void _loadInterstitialAd() {
+    if (!_isInitialized) return;
+    
     InterstitialAd.load(
       adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
@@ -105,8 +128,6 @@ class AdService {
               _loadInterstitialAd(); // Riprova a caricare l'annuncio
             },
           );
-          
-          print('Interstitial ad loaded');
         },
         onAdFailedToLoad: (error) {
           print('Interstitial ad failed to load: ${error.message}');
@@ -120,8 +141,8 @@ class AdService {
   
   // Metodo per incrementare il contatore e mostrare un interstiziale se necessario
   Future<bool> showInterstitialAd() async {
-    // Non mostrare annunci se l'utente è premium
-    if (_premiumService.isPremium) {
+    // Non mostrare annunci se l'utente è premium o il servizio non è inizializzato
+    if (_premiumService.isPremium || !_isInitialized) {
       return false;
     }
     

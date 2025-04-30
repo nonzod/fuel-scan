@@ -41,10 +41,10 @@ class FuelStationsProvider with ChangeNotifier {
   bool get onlySelfService => _onlySelfService;
   bool get isInitializing => _isInitializing;
   
-  // Inizializzazione - modificata per evitare chiamate a notifyListeners durante la build
+  // Inizializzazione ottimizzata
   Future<void> initialize() async {
     // Evitiamo di inizializzare più volte
-    if (_isInitializing) return;
+    if (_isInitializing || _status != LoadingStatus.idle) return;
     _isInitializing = true;
     
     // Prima impostiamo lo stato di loading e notifichiamo
@@ -54,31 +54,43 @@ class FuelStationsProvider with ChangeNotifier {
     try {
       print('Inizializzazione FuelStationsProvider...');
       
-      // Ottieni la posizione utente prima di tutto
-      _currentPosition = await _locationService.getCurrentPosition();
-      print('Posizione utente ottenuta: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
-      
-      // Carica i dati dal database locale
+      // Carica i dati dal database locale prima di tutto
       _stations = await _storageService.loadStations();
       print('Caricate ${_stations.length} stazioni dal database locale');
       
-      // Controlla se è necessario un aggiornamento
-      bool needsUpdate = await _storageService.needsUpdate();
+      // Se non ci sono stazioni locali, fai subito una chiamata all'API
+      bool needsUpdate = true;
+      if (_stations.isNotEmpty) {
+        // Controlla se è necessario un aggiornamento solo se abbiamo dati locali
+        needsUpdate = await _storageService.needsUpdate();
+      }
       print('È necessario un aggiornamento? $needsUpdate');
       
-      if (needsUpdate || _stations.isEmpty) {
-        print('Aggiornamento dati...');
-        await _updateData(); // Usando un metodo privato per l'aggiornamento effettivo
-      } else {
-        // Aggiorna le distanze
+      // Obtieni la posizione utente
+      try {
+        _currentPosition = await _locationService.getCurrentPosition();
+        print('Posizione utente ottenuta: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      } catch (e) {
+        print('Errore nel recupero della posizione: $e');
+        // Continuiamo comunque, anche senza posizione
+      }
+      
+      // Aggiorna le distanze delle stazioni caricate dal DB locale
+      if (_stations.isNotEmpty) {
         _stations = await _locationService.calculateDistances(
           _stations, 
           currentPosition: _currentPosition
         );
-        
-        // Applica i filtri
-        _applyFilters();
       }
+      
+      // Se è necessario un aggiornamento o non abbiamo stazioni, scarica i dati
+      if (needsUpdate || _stations.isEmpty) {
+        print('Aggiornamento dati...');
+        await _updateData();
+      }
+      
+      // Applica i filtri
+      _applyFilters();
       
       _status = LoadingStatus.success;
     } catch (e) {
@@ -99,10 +111,14 @@ class FuelStationsProvider with ChangeNotifier {
           print('Anche il recupero dati di emergenza è fallito: $e2');
         }
       }
+    } finally {
+      _isInitializing = false;
+      // Assicuriamoci che ci siano sempre stazioni filtrate, anche vuote
+      if (_filteredStations.isEmpty && _stations.isNotEmpty) {
+        _filteredStations = List.from(_stations);
+      }
+      notifyListeners();
     }
-    
-    _isInitializing = false;
-    notifyListeners();
   }
   
   // Metodo interno per aggiornamento dati
@@ -110,8 +126,12 @@ class FuelStationsProvider with ChangeNotifier {
     try {
       // Scarica i dati delle stazioni
       print('Scaricamento stazioni...');
-      _stations = await _apiService.fetchFuelStations();
-      print('Scaricate ${_stations.length} stazioni');
+      final newStations = await _apiService.fetchFuelStations();
+      print('Scaricate ${newStations.length} stazioni');
+      
+      if (newStations.isEmpty) {
+        throw Exception('Nessuna stazione scaricata dall\'API');
+      }
       
       // Scarica i prezzi
       print('Scaricamento prezzi...');
@@ -122,10 +142,10 @@ class FuelStationsProvider with ChangeNotifier {
       print('Aggiornamento stazioni con i prezzi...');
       int updatedStations = 0;
       for (var stationId in prices.keys) {
-        final stationIndex = _stations.indexWhere((s) => s.id == stationId);
+        final stationIndex = newStations.indexWhere((s) => s.id == stationId);
         
         if (stationIndex >= 0) {
-          _stations[stationIndex].updatePrices(prices[stationId]!);
+          newStations[stationIndex].updatePrices(prices[stationId]!);
           updatedStations++;
         }
       }
@@ -133,26 +153,28 @@ class FuelStationsProvider with ChangeNotifier {
       
       // Calcola le distanze
       print('Calcolo delle distanze...');
-      _stations = await _locationService.calculateDistances(
-        _stations,
-        currentPosition: _currentPosition
-      );
+      if (_currentPosition != null) {
+        _stations = await _locationService.calculateDistances(
+          newStations,
+          currentPosition: _currentPosition
+        );
+      } else {
+        _stations = newStations;
+      }
       
       // Salva i dati localmente
       print('Salvataggio dati localmente...');
       await _storageService.saveStations(_stations);
-      
-      // Applica i filtri
-      print('Applicazione filtri...');
-      _applyFilters();
     } catch (e) {
       print('Errore durante l\'aggiornamento dati: $e');
-      rethrow; // Rilanciamo l'eccezione per gestirla nel metodo chiamante
+      rethrow;
     }
   }
   
   // Aggiornamento dati dalle API (esposto pubblicamente)
   Future<void> refreshData() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
     _status = LoadingStatus.loading;
     notifyListeners();
     
@@ -160,11 +182,19 @@ class FuelStationsProvider with ChangeNotifier {
       print('Aggiornamento dati...');
       
       // Ottieni la posizione attuale
-      _currentPosition = await _locationService.getCurrentPosition();
-      print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      try {
+        _currentPosition = await _locationService.getCurrentPosition();
+        print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      } catch (e) {
+        print('Errore nel recupero della posizione durante l\'aggiornamento: $e');
+        // Continuiamo comunque, anche senza posizione
+      }
       
       // Esegui l'aggiornamento dei dati
       await _updateData();
+      
+      // Applica i filtri
+      _applyFilters();
       
       _status = LoadingStatus.success;
       print('Aggiornamento completato con successo');
@@ -172,15 +202,22 @@ class FuelStationsProvider with ChangeNotifier {
       print('Errore durante l\'aggiornamento: $e');
       _errorMessage = 'Errore durante l\'aggiornamento: $e';
       _status = LoadingStatus.error;
+    } finally {
+      _isInitializing = false;
+      notifyListeners();
     }
-    
-    notifyListeners();
   }
   
   // Metodo per filtrare le stazioni
   void _applyFilters() {
     try {
       print('Applicazione filtri alle ${_stations.length} stazioni...');
+      
+      // Se non ci sono stazioni, evitiamo di filtrare
+      if (_stations.isEmpty) {
+        _filteredStations = [];
+        return;
+      }
       
       _filteredStations = _stations.where((station) {
         // Filtra per distanza
