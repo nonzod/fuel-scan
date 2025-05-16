@@ -4,8 +4,9 @@ import 'package:fuel_scan/models/fuel_station.dart';
 import 'package:fuel_scan/services/api_service.dart';
 import 'package:fuel_scan/services/location_service.dart';
 import 'package:fuel_scan/services/storage_service.dart';
+import 'package:fuel_scan/services/connectivity_service.dart'; // Aggiungi questa importazione
 
-enum LoadingStatus { idle, loading, success, error }
+enum LoadingStatus { idle, loading, success, error, offline } // Aggiungi stato offline
 enum FuelType { benzina, gasolio, gpl, metano }
 enum SortOption { distance, price, name }
 
@@ -13,6 +14,7 @@ class FuelStationsProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LocationService _locationService = LocationService();
   final StorageService _storageService = StorageService();
+  final ConnectivityService _connectivityService = ConnectivityService(); // Aggiungi questo
   
   List<FuelStation> _stations = [];
   List<FuelStation> _filteredStations = [];
@@ -27,6 +29,7 @@ class FuelStationsProvider with ChangeNotifier {
   double _maxDistance = 10.0; // km
   bool _onlySelfService = false;
   bool _isInitializing = false;
+  bool _isOffline = false; // Aggiungi questa variabile
   
   // Getters
   List<FuelStation> get stations => _stations;
@@ -40,6 +43,7 @@ class FuelStationsProvider with ChangeNotifier {
   double get maxDistance => _maxDistance;
   bool get onlySelfService => _onlySelfService;
   bool get isInitializing => _isInitializing;
+  bool get isOffline => _isOffline; // Aggiungi questo getter
   
   // Inizializzazione ottimizzata
   Future<void> initialize() async {
@@ -54,6 +58,10 @@ class FuelStationsProvider with ChangeNotifier {
     try {
       print('Inizializzazione FuelStationsProvider...');
       
+      // Controlla connettività
+      final isConnected = await _connectivityService.isConnected();
+      _isOffline = !isConnected;
+      
       // Carica i dati dal database locale prima di tutto
       _stations = await _storageService.loadStations();
       print('Caricate ${_stations.length} stazioni dal database locale');
@@ -66,7 +74,7 @@ class FuelStationsProvider with ChangeNotifier {
       }
       print('È necessario un aggiornamento? $needsUpdate');
       
-      // Obtieni la posizione utente
+      // Ottieni la posizione utente
       try {
         _currentPosition = await _locationService.getCurrentPosition();
         print('Posizione utente ottenuta: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
@@ -83,20 +91,52 @@ class FuelStationsProvider with ChangeNotifier {
         );
       }
       
-      // Se è necessario un aggiornamento o non abbiamo stazioni, scarica i dati
-      if (needsUpdate || _stations.isEmpty) {
+      // Se siamo offline ma abbiamo dati locali, mostriamo quelli senza aggiornamento
+      if (_isOffline && _stations.isNotEmpty) {
+        print('Modalità offline: utilizzo dati locali');
+        _status = LoadingStatus.offline;
+        _errorMessage = 'Nessuna connessione Internet. Mostrando dati salvati.';
+      }
+      // Se è necessario un aggiornamento o non abbiamo stazioni, e siamo online, scarica i dati
+      else if ((needsUpdate || _stations.isEmpty) && isConnected) {
         print('Aggiornamento dati...');
         await _updateData();
+        _status = LoadingStatus.success;
+      } 
+      // Se abbiamo dati locali e non serve aggiornare, usiamo quelli
+      else if (_stations.isNotEmpty) {
+        _status = LoadingStatus.success;
+      }
+      // Altrimenti siamo offline senza dati locali
+      else {
+        _status = LoadingStatus.offline;
+        _errorMessage = 'Nessuna connessione Internet e nessun dato salvato.';
       }
       
       // Applica i filtri
       _applyFilters();
       
-      _status = LoadingStatus.success;
     } catch (e) {
       print('Errore durante l\'inizializzazione: $e');
       _errorMessage = 'Errore durante l\'inizializzazione: $e';
-      _status = LoadingStatus.error;
+      
+      // Verifica se è un errore di connettività
+      if (e.toString().contains('Failed host lookup') || 
+          e.toString().contains('SocketException') ||
+          e.toString().contains('HttpException')) {
+        _isOffline = true;
+        _status = LoadingStatus.offline;
+        _errorMessage = 'Nessuna connessione Internet. ';
+        
+        // Se abbiamo dati locali, mostriamo quelli
+        if (_stations.isNotEmpty) {
+          _errorMessage += 'Mostrando dati salvati.';
+        } else {
+          _errorMessage += 'Nessun dato salvato.';
+        }
+      } else {
+        _status = LoadingStatus.error;
+      }
       
       // In caso di errore, assicuriamoci comunque di avere qualche dato da mostrare
       if (_stations.isEmpty) {
@@ -105,7 +145,9 @@ class FuelStationsProvider with ChangeNotifier {
           _stations = await _apiService.fetchFuelStations();
           if (_stations.isNotEmpty) {
             _applyFilters();
-            _status = LoadingStatus.success;
+            if (_status != LoadingStatus.offline) {
+              _status = LoadingStatus.success;
+            }
           }
         } catch (e2) {
           print('Anche il recupero dati di emergenza è fallito: $e2');
@@ -117,6 +159,74 @@ class FuelStationsProvider with ChangeNotifier {
       if (_filteredStations.isEmpty && _stations.isNotEmpty) {
         _filteredStations = List.from(_stations);
       }
+      
+      // Inizia a monitorare i cambiamenti di connettività
+      _connectivityService.startMonitoring((isConnected) {
+        _isOffline = !isConnected;
+        // Notifica i listener solo se cambia lo stato
+        notifyListeners();
+      });
+      
+      notifyListeners();
+    }
+  }
+  
+  // Aggiorniamo anche il metodo refreshData per gestire la connettività
+  Future<void> refreshData() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
+    _status = LoadingStatus.loading;
+    notifyListeners();
+    
+    try {
+      print('Aggiornamento dati...');
+      
+      // Controlla connettività
+      final isConnected = await _connectivityService.isConnected();
+      _isOffline = !isConnected;
+      
+      if (!isConnected) {
+        print('Impossibile aggiornare: nessuna connessione internet');
+        _status = LoadingStatus.offline;
+        _errorMessage = 'Nessuna connessione Internet. Mostrando dati salvati.';
+        _isInitializing = false;
+        notifyListeners();
+        return;
+      }
+      
+      // Ottieni la posizione attuale
+      try {
+        _currentPosition = await _locationService.getCurrentPosition();
+        print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      } catch (e) {
+        print('Errore nel recupero della posizione durante l\'aggiornamento: $e');
+        // Continuiamo comunque, anche senza posizione
+      }
+      
+      // Esegui l'aggiornamento dei dati
+      await _updateData();
+      
+      // Applica i filtri
+      _applyFilters();
+      
+      _status = LoadingStatus.success;
+      print('Aggiornamento completato con successo');
+    } catch (e) {
+      print('Errore durante l\'aggiornamento: $e');
+      
+      // Verifica se è un errore di connettività
+      if (e.toString().contains('Failed host lookup') || 
+          e.toString().contains('SocketException') ||
+          e.toString().contains('HttpException')) {
+        _isOffline = true;
+        _status = LoadingStatus.offline;
+        _errorMessage = 'Nessuna connessione Internet. Mostrando dati salvati.';
+      } else {
+        _errorMessage = 'Errore durante l\'aggiornamento: $e';
+        _status = LoadingStatus.error;
+      }
+    } finally {
+      _isInitializing = false;
       notifyListeners();
     }
   }
@@ -168,43 +278,6 @@ class FuelStationsProvider with ChangeNotifier {
     } catch (e) {
       print('Errore durante l\'aggiornamento dati: $e');
       rethrow;
-    }
-  }
-  
-  // Aggiornamento dati dalle API (esposto pubblicamente)
-  Future<void> refreshData() async {
-    if (_isInitializing) return;
-    _isInitializing = true;
-    _status = LoadingStatus.loading;
-    notifyListeners();
-    
-    try {
-      print('Aggiornamento dati...');
-      
-      // Ottieni la posizione attuale
-      try {
-        _currentPosition = await _locationService.getCurrentPosition();
-        print('Posizione attuale aggiornata: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
-      } catch (e) {
-        print('Errore nel recupero della posizione durante l\'aggiornamento: $e');
-        // Continuiamo comunque, anche senza posizione
-      }
-      
-      // Esegui l'aggiornamento dei dati
-      await _updateData();
-      
-      // Applica i filtri
-      _applyFilters();
-      
-      _status = LoadingStatus.success;
-      print('Aggiornamento completato con successo');
-    } catch (e) {
-      print('Errore durante l\'aggiornamento: $e');
-      _errorMessage = 'Errore durante l\'aggiornamento: $e';
-      _status = LoadingStatus.error;
-    } finally {
-      _isInitializing = false;
-      notifyListeners();
     }
   }
   
@@ -358,5 +431,11 @@ class FuelStationsProvider with ChangeNotifier {
     _onlySelfService = value;
     _applyFilters();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _connectivityService.stopMonitoring();
+    super.dispose();
   }
 }

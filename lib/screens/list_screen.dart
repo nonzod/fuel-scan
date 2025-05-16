@@ -49,9 +49,7 @@ class ListScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Expanded(
-                child: _buildStationsList(context, provider),
-              ),
+              Expanded(child: _buildStationsList(context, provider)),
               // Banner nella parte inferiore
               const BannerAdWidget(),
             ],
@@ -62,13 +60,11 @@ class ListScreen extends StatelessWidget {
   }
 
   Widget _buildStationsList(
-    BuildContext context, 
-    FuelStationsProvider provider
+    BuildContext context,
+    FuelStationsProvider provider,
   ) {
     if (provider.status == LoadingStatus.loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (provider.status == LoadingStatus.error) {
@@ -91,10 +87,65 @@ class ListScreen extends StatelessWidget {
       );
     }
 
-    if (provider.filteredStations.isEmpty) {
-      return const Center(
-        child: Text('Nessuna stazione trovata'),
+    // Aggiungi questa condizione per mostrare il messaggio offline
+    if (provider.status == LoadingStatus.offline) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (provider.filteredStations.isEmpty) ...[
+            const Icon(Icons.wifi_off, size: 50, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text(provider.errorMessage),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                provider.refreshData();
+              },
+              child: const Text('Riprova'),
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.orange.shade100,
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      provider.errorMessage,
+                      style: const TextStyle(color: Colors.deepOrange),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      provider.refreshData();
+                    },
+                    child: const Text('Aggiorna'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: provider.filteredStations.length,
+                itemBuilder: (context, index) {
+                  final station = provider.filteredStations[index];
+                  return StationListItem(
+                    station: station,
+                    onTap: () => _navigateToDetails(context, station),
+                    selectedFuelType: provider.selectedFuelType,
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
       );
+    }
+
+    if (provider.filteredStations.isEmpty) {
+      return const Center(child: Text('Nessuna stazione trovata'));
     }
 
     return ListView.builder(
@@ -113,12 +164,10 @@ class ListScreen extends StatelessWidget {
   void _navigateToDetails(BuildContext context, FuelStation station) async {
     // Mostriamo un interstiziale prima di navigare (occasionalmente)
     await AdService().showInterstitialAd();
-    
+
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => DetailsScreen(station: station),
-      ),
+      MaterialPageRoute(builder: (context) => DetailsScreen(station: station)),
     );
   }
 

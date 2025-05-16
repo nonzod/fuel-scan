@@ -21,6 +21,7 @@ dependencies:
   path_provider: ^2.1.1     # Per accedere alle directory dell'app
   url_launcher: ^6.2.5      # Per lanciare URL esterni (Google Maps)
   google_mobile_ads: ^4.0.0  # Per la pubblicità con AdMob
+  connectivity_plus: ^5.0.2  # Per controllare lo stato della connessione
   
 dev_dependencies:
   flutter_test:
