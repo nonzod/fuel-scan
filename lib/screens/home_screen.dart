@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       appBar: AppBar(
-        title: const Text('Fuel Scan'),
+        title: const Text('Il pieno giusto'),
         actions: [
           // Pulsante di ricarica dati
           if (_dataInitialized)
