@@ -20,12 +20,6 @@ class ListScreen extends StatelessWidget {
             title: const Text('Lista'),
             actions: [
               IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  provider.refreshData();
-                },
-              ),
-              IconButton(
                 icon: const Icon(Icons.filter_list),
                 onPressed: () {
                   _showFilterBottomSheet(context);

@@ -37,12 +37,6 @@ class _MapScreenState extends State<MapScreen> {
             title: const Text('Mappa'),
             actions: [
               IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  provider.refreshData();
-                },
-              ),
-              IconButton(
                 icon: const Icon(Icons.filter_list),
                 onPressed: () {
                   _showFilterBottomSheet(context);
